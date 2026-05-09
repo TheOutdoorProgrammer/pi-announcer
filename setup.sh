@@ -20,7 +20,8 @@ echo "Configuring PulseAudio for Docker TCP access, HDMI keep-alive, and high-qu
 cat > "$PULSE_CONFIG" <<'EOF'
 .include /etc/pulse/default.pa
 load-module module-native-protocol-tcp auth-anonymous=1
-unload-module module-suspend-on-idle
+set-default-sample-channels 2
+set-default-sample-rate 44100
 EOF
 
 PULSE_DAEMON_CONFIG="$HOME/.config/pulse/daemon.conf"

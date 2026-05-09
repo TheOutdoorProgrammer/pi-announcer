@@ -20,12 +20,16 @@ class PiperTTS:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
+    def _normalize(self, message: str) -> str:
+        return message.lower().strip()
+
     def _cache_key(self, message: str) -> str:
-        raw = f"{message}|{self.model_path}|{self.speaker}"
+        raw = f"{self._normalize(message)}|{self.model_path}|{self.speaker}"
         return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
     def synthesize(self, message: str) -> Path:
         """Generate a WAV file from text. Returns path to cached WAV."""
+        message = self._normalize(message)
         key = self._cache_key(message)
         wav_path = self.cache_dir / f"{key}.wav"
 
@@ -35,12 +39,15 @@ class PiperTTS:
 
         logger.info("Generating TTS for '%s' (speaker %d)", message, self.speaker)
 
+        # Generate raw TTS to a temp file
+        raw_path = self.cache_dir / f"{key}_raw.wav"
+
         result = subprocess.run(
             [
                 self.piper_binary,
                 "--model", self.model_path,
                 "--speaker", str(self.speaker),
-                "--output_file", str(wav_path),
+                "--output_file", str(raw_path),
             ],
             input=message.encode(),
             capture_output=True,
@@ -49,8 +56,25 @@ class PiperTTS:
 
         if result.returncode != 0:
             logger.error("Piper failed: %s", result.stderr.decode())
-            wav_path.unlink(missing_ok=True)
+            raw_path.unlink(missing_ok=True)
             raise RuntimeError(f"Piper TTS failed: {result.stderr.decode()}")
+
+        # Convert to stereo 44100 Hz to match PulseAudio sink format
+        # This prevents format-change pops on HDMI audio
+        sox_result = subprocess.run(
+            [
+                "sox", str(raw_path), "-r", "44100", "-c", "2", str(wav_path),
+            ],
+            capture_output=True,
+            timeout=30,
+        )
+
+        raw_path.unlink(missing_ok=True)
+
+        if sox_result.returncode != 0:
+            logger.error("sox conversion failed: %s", sox_result.stderr.decode())
+            wav_path.unlink(missing_ok=True)
+            raise RuntimeError(f"Audio conversion failed: {sox_result.stderr.decode()}")
 
         logger.info("Generated %s (%.1f KB)", wav_path, wav_path.stat().st_size / 1024)
         return wav_path

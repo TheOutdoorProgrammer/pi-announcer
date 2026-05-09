@@ -13,16 +13,16 @@ SILENCE_PATH = Path("/tmp/silence.wav")
 
 
 def _create_silence_file(duration_ms: int) -> None:
-    """Create a silence WAV to wake up HDMI audio before announcements."""
-    # Always recreate in case duration changed
-    sample_rate = 22050
-    num_samples = int(sample_rate * duration_ms / 1000)
+    """Create a silence WAV matching PulseAudio sink format (stereo 44100Hz)."""
+    sample_rate = 44100
+    channels = 2
+    num_samples = int(sample_rate * duration_ms / 1000) * channels
     with wave.open(str(SILENCE_PATH), "w") as wf:
-        wf.setnchannels(1)
+        wf.setnchannels(channels)
         wf.setsampwidth(2)
         wf.setframerate(sample_rate)
         wf.writeframes(struct.pack(f"<{num_samples}h", *([0] * num_samples)))
-    logger.info("Created silence pad: %dms -> %s", duration_ms, SILENCE_PATH)
+    logger.info("Created silence pad: %dms stereo 44100Hz -> %s", duration_ms, SILENCE_PATH)
 
 
 class AudioPlayer:
