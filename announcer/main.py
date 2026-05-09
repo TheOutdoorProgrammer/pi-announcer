@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
@@ -30,6 +29,27 @@ player = AudioPlayer(
     silence_ms=int(os.getenv("SILENCE_MS", "1000")),
 )
 
+# Queue for sequential announcement processing
+_announce_queue: asyncio.Queue = asyncio.Queue()
+
+
+async def _queue_worker() -> None:
+    """Process announcements sequentially from the queue."""
+    while True:
+        message, volume = await _announce_queue.get()
+        try:
+            wav_path = await asyncio.to_thread(tts.synthesize, message)
+            await player.play(wav_path, volume)
+        except Exception:
+            logger.exception("Announce failed for: %s", message)
+        finally:
+            _announce_queue.task_done()
+
+
+@app.on_event("startup")
+async def startup() -> None:
+    asyncio.create_task(_queue_worker())
+
 
 class AnnounceRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=500)
@@ -40,7 +60,7 @@ class AnnounceRequest(BaseModel):
 class AnnounceResponse(BaseModel):
     status: str
     message: str
-    cached: bool
+    queued: bool
 
 
 class HealthResponse(BaseModel):
@@ -48,35 +68,19 @@ class HealthResponse(BaseModel):
     voice: str
     speaker: int
     cache_size: int
-
-
-async def _play_in_background(wav_path: Path, volume: Optional[int]) -> None:
-    """Play audio without blocking the HTTP response."""
-    try:
-        await player.play(wav_path, volume)
-    except Exception:
-        logger.exception("Background playback failed for: %s", wav_path)
+    queue_size: int
 
 
 @app.post("/announce", response_model=AnnounceResponse)
 async def announce(req: AnnounceRequest):
-    cache_key = tts._cache_key(req.message)
-    was_cached = (tts.cache_dir / f"{cache_key}.wav").exists()
-
-    # Generate TTS (blocks on first request, instant on cache hit)
-    try:
-        wav_path = await asyncio.to_thread(tts.synthesize, req.message)
-    except Exception as e:
-        logger.exception("TTS generation failed")
-        raise HTTPException(status_code=500, detail=str(e))
-
-    # Fire and forget playback — return HTTP response immediately
-    asyncio.create_task(_play_in_background(wav_path, req.volume))
+    # Drop it on the queue and return immediately
+    await _announce_queue.put((req.message, req.volume))
+    logger.info("Queued: '%s' (queue size: %d)", req.message, _announce_queue.qsize())
 
     return AnnounceResponse(
         status="ok",
         message=req.message,
-        cached=was_cached,
+        queued=True,
     )
 
 
@@ -94,4 +98,5 @@ async def health():
         voice=os.path.basename(tts.model_path),
         speaker=tts.speaker,
         cache_size=len(cache_files),
+        queue_size=_announce_queue.qsize(),
     )
