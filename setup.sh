@@ -20,14 +20,13 @@ echo "Configuring PulseAudio for Docker TCP access, HDMI keep-alive, and high-qu
 cat > "$PULSE_CONFIG" <<'EOF'
 .include /etc/pulse/default.pa
 load-module module-native-protocol-tcp auth-anonymous=1
-set-default-sample-channels 2
-set-default-sample-rate 44100
 EOF
 
 PULSE_DAEMON_CONFIG="$HOME/.config/pulse/daemon.conf"
 cat > "$PULSE_DAEMON_CONFIG" <<'EOF'
 resample-method = src-sinc-best-quality
 default-sample-rate = 44100
+default-sample-channels = 2
 EOF
 
 # Restart PulseAudio to pick up new config
