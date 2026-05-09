@@ -4,7 +4,7 @@ services:
     container_name: pi-announcer
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8180:8080"
     volumes:
       - /run/user/1000/pulse:/run/user/1000/pulse
       - voices:/data/voices
