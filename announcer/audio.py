@@ -1,16 +1,36 @@
 import asyncio
 import logging
 import subprocess
+import struct
+import wave
 from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+SILENCE_PATH = Path("/tmp/silence.wav")
+
+
+def _ensure_silence_file() -> None:
+    """Create a short silence WAV to wake up HDMI audio before announcements."""
+    if SILENCE_PATH.exists():
+        return
+    sample_rate = 22050
+    duration_ms = 500
+    num_samples = int(sample_rate * duration_ms / 1000)
+    with wave.open(str(SILENCE_PATH), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(struct.pack(f"<{num_samples}h", *([0] * num_samples)))
+    logger.info("Created silence pad: %s", SILENCE_PATH)
 
 
 class AudioPlayer:
     def __init__(self, default_volume: int = 80):
         self.default_volume = default_volume
         self._lock = asyncio.Lock()
+        _ensure_silence_file()
 
     async def play(self, wav_path: Path, volume: Optional[int] = None) -> None:
         """Play a WAV file through PulseAudio. Queues if something is already playing."""
@@ -22,6 +42,14 @@ class AudioPlayer:
             await asyncio.to_thread(
                 subprocess.run,
                 ["pactl", "set-sink-volume", "@DEFAULT_SINK@", str(pa_volume)],
+                capture_output=True,
+                timeout=5,
+            )
+
+            # Play a short silence to wake up HDMI DAC before the real audio
+            await asyncio.to_thread(
+                subprocess.run,
+                ["paplay", str(SILENCE_PATH)],
                 capture_output=True,
                 timeout=5,
             )
