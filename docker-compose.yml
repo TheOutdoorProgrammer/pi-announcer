@@ -1,0 +1,19 @@
+services:
+  announcer:
+    image: ghcr.io/theoutdoorprogrammer/pi-announcer:latest
+    container_name: pi-announcer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /run/user/1000/pulse:/run/user/1000/pulse
+      - voices:/data/voices
+      - cache:/data/cache
+    environment:
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
+      - PIPER_SPEAKER=82
+      - DEFAULT_VOLUME=80
+
+volumes:
+  voices:
+  cache:
