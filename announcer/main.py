@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
@@ -49,23 +50,34 @@ class HealthResponse(BaseModel):
     cache_size: int
 
 
+async def _play_in_background(wav_path: Path, volume: Optional[int]) -> None:
+    """Play audio without blocking the HTTP response."""
+    try:
+        await player.play(wav_path, volume)
+    except Exception:
+        logger.exception("Background playback failed for: %s", wav_path)
+
+
 @app.post("/announce", response_model=AnnounceResponse)
 async def announce(req: AnnounceRequest):
+    cache_key = tts._cache_key(req.message)
+    was_cached = (tts.cache_dir / f"{cache_key}.wav").exists()
+
+    # Generate TTS (blocks on first request, instant on cache hit)
     try:
-        cache_key_before = tts._cache_key(req.message)
-        was_cached = (tts.cache_dir / f"{cache_key_before}.wav").exists()
-
         wav_path = await asyncio.to_thread(tts.synthesize, req.message)
-        await player.play(wav_path, req.volume)
-
-        return AnnounceResponse(
-            status="ok",
-            message=req.message,
-            cached=was_cached,
-        )
     except Exception as e:
-        logger.exception("Announce failed")
+        logger.exception("TTS generation failed")
         raise HTTPException(status_code=500, detail=str(e))
+
+    # Fire and forget playback — return HTTP response immediately
+    asyncio.create_task(_play_in_background(wav_path, req.volume))
+
+    return AnnounceResponse(
+        status="ok",
+        message=req.message,
+        cached=was_cached,
+    )
 
 
 @app.post("/cache/clear")
