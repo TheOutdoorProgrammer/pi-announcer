@@ -13,6 +13,7 @@ services:
       - PULSE_SERVER=tcp:172.17.0.1:4713
       - PIPER_SPEAKER=82
       - DEFAULT_VOLUME=80
+      - SILENCE_MS=1000
 
 volumes:
   voices:

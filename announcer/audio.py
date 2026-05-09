@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import subprocess
 import struct
 import wave
@@ -11,26 +12,26 @@ logger = logging.getLogger(__name__)
 SILENCE_PATH = Path("/tmp/silence.wav")
 
 
-def _ensure_silence_file() -> None:
-    """Create a short silence WAV to wake up HDMI audio before announcements."""
-    if SILENCE_PATH.exists():
-        return
+def _create_silence_file(duration_ms: int) -> None:
+    """Create a silence WAV to wake up HDMI audio before announcements."""
+    # Always recreate in case duration changed
     sample_rate = 22050
-    duration_ms = 1000
     num_samples = int(sample_rate * duration_ms / 1000)
     with wave.open(str(SILENCE_PATH), "w") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
         wf.setframerate(sample_rate)
         wf.writeframes(struct.pack(f"<{num_samples}h", *([0] * num_samples)))
-    logger.info("Created silence pad: %s", SILENCE_PATH)
+    logger.info("Created silence pad: %dms -> %s", duration_ms, SILENCE_PATH)
 
 
 class AudioPlayer:
-    def __init__(self, default_volume: int = 80):
+    def __init__(self, default_volume: int = 80, silence_ms: int = 1000):
         self.default_volume = default_volume
+        self.silence_ms = silence_ms
         self._lock = asyncio.Lock()
-        _ensure_silence_file()
+        if silence_ms > 0:
+            _create_silence_file(silence_ms)
 
     async def play(self, wav_path: Path, volume: Optional[int] = None) -> None:
         """Play a WAV file through PulseAudio. Queues if something is already playing."""
@@ -47,12 +48,13 @@ class AudioPlayer:
             )
 
             # Play a short silence to wake up HDMI DAC before the real audio
-            await asyncio.to_thread(
-                subprocess.run,
-                ["paplay", str(SILENCE_PATH)],
-                capture_output=True,
-                timeout=5,
-            )
+            if self.silence_ms > 0 and SILENCE_PATH.exists():
+                await asyncio.to_thread(
+                    subprocess.run,
+                    ["paplay", str(SILENCE_PATH)],
+                    capture_output=True,
+                    timeout=5,
+                )
 
             logger.info("Playing %s at volume %d%%", wav_path.name, vol)
             result = await asyncio.to_thread(

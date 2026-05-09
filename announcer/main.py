@@ -26,6 +26,7 @@ tts = PiperTTS(
 
 player = AudioPlayer(
     default_volume=int(os.getenv("DEFAULT_VOLUME", "80")),
+    silence_ms=int(os.getenv("SILENCE_MS", "1000")),
 )
 
 

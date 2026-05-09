@@ -30,6 +30,7 @@ ENV PIPER_MODEL=/data/voices/en_US-libritts_r-medium.onnx
 ENV PIPER_SPEAKER=82
 ENV DEFAULT_VOLUME=80
 ENV CACHE_DIR=/data/cache
+ENV SILENCE_MS=1000
 ENV PULSE_SERVER=unix:/run/user/1000/pulse/native
 
 CMD ["python3", "-m", "uvicorn", "announcer.main:app", "--host", "0.0.0.0", "--port", "8080"]
