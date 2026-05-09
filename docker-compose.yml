@@ -3,6 +3,8 @@ services:
     image: ghcr.io/theoutdoorprogrammer/pi-announcer:latest
     container_name: pi-announcer
     restart: unless-stopped
+    security_opt:
+      - seccomp=unconfined
     ports:
       - "8180:8080"
     volumes:
