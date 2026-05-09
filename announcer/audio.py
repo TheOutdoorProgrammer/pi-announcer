@@ -16,7 +16,7 @@ def _ensure_silence_file() -> None:
     if SILENCE_PATH.exists():
         return
     sample_rate = 22050
-    duration_ms = 500
+    duration_ms = 1000
     num_samples = int(sample_rate * duration_ms / 1000)
     with wave.open(str(SILENCE_PATH), "w") as wf:
         wf.setnchannels(1)
