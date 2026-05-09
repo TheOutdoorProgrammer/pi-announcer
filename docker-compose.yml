@@ -7,13 +7,10 @@ services:
     ports:
       - "8180:8080"
     volumes:
-      - /run/user/1000/pulse:/run/user/1000/pulse
-      - /home/pi/.config/pulse/cookie:/tmp/pulse-cookie:ro
       - voices:/data/voices
       - cache:/data/cache
     environment:
-      - PULSE_SERVER=unix:/run/user/1000/pulse/native
-      - PULSE_COOKIE=/tmp/pulse-cookie
+      - PULSE_SERVER=tcp:172.17.0.1:4713
       - PIPER_SPEAKER=82
       - DEFAULT_VOLUME=80
 

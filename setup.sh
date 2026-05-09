@@ -13,6 +13,19 @@ if ! command -v pulseaudio &>/dev/null; then
     sudo apt-get install -y -qq pulseaudio pulseaudio-utils
 fi
 
+# Configure PulseAudio with TCP access for Docker containers
+PULSE_CONFIG="$HOME/.config/pulse/default.pa"
+mkdir -p "$(dirname "$PULSE_CONFIG")"
+if ! grep -q "module-native-protocol-tcp" "$PULSE_CONFIG" 2>/dev/null; then
+    echo "Configuring PulseAudio TCP access for Docker..."
+    cat > "$PULSE_CONFIG" <<'EOF'
+.include /etc/pulse/default.pa
+load-module module-native-protocol-tcp auth-anonymous=1
+EOF
+    # Restart PulseAudio to pick up new config
+    pulseaudio -k 2>/dev/null || true
+fi
+
 # Start PulseAudio if not running
 if ! pulseaudio --check 2>/dev/null; then
     echo "Starting PulseAudio..."
@@ -62,9 +75,9 @@ docker compose up -d
 
 echo ""
 echo "=== Setup Complete ==="
-echo "Service running at: http://$(hostname -I | awk '{print $1}'):8080"
+echo "Service running at: http://$(hostname -I | awk '{print $1}'):8180"
 echo ""
 echo "Test it:"
-echo "  curl -X POST http://localhost:8080/announce \\"
+echo "  curl -X POST http://localhost:8180/announce \\"
 echo "    -H 'Content-Type: application/json' \\"
 echo "    -d '{\"message\": \"Pi announcer is ready\"}'"
