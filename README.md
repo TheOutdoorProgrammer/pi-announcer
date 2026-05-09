@@ -45,6 +45,37 @@ Parameters:
 - `volume` (optional): Playback volume 0-100 (default: 80)
 - `priority` (optional): `normal` or `urgent` (default: normal)
 
+### POST /volume/up
+
+Increase TV volume via HDMI-CEC. No absolute volume level available, only relative.
+
+```bash
+curl -X POST http://<pi-ip>:8180/volume/up \
+  -H 'Content-Type: application/json' \
+  -d '{"steps": 2}'
+```
+
+Parameters:
+- `steps` (optional): Number of volume increments, 1-20 (default: 1)
+
+### POST /volume/down
+
+Decrease TV volume via HDMI-CEC.
+
+```bash
+curl -X POST http://<pi-ip>:8180/volume/down \
+  -H 'Content-Type: application/json' \
+  -d '{"steps": 2}'
+```
+
+### POST /volume/mute
+
+Toggle TV mute via HDMI-CEC.
+
+```bash
+curl -X POST http://<pi-ip>:8180/volume/mute
+```
+
 ### POST /cache/clear
 
 Clear all cached WAV files. Use after changing voice/speaker settings.
@@ -126,8 +157,9 @@ action:
 - **TTS**: Piper standalone binary (C++/ONNX, no Python dependency for inference)
 - **Audio conversion**: sox converts Piper's mono 22050Hz output to stereo 44100Hz
 - **Playback**: PulseAudio via TCP from container to host
+- **TV volume**: HDMI-CEC via `cec-ctl` (v4l-utils), relative up/down/mute only
 - **Web server**: Python FastAPI + uvicorn
-- **Container**: Runs privileged for PulseAudio access, `restart: unless-stopped`
+- **Container**: Runs privileged for PulseAudio and `/dev/cec0` access, `restart: unless-stopped`
 
 ## PulseAudio Setup (handled by setup.sh)
 
