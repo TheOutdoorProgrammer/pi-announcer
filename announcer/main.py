@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import subprocess
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
@@ -82,6 +83,56 @@ async def announce(req: AnnounceRequest):
         message=req.message,
         queued=True,
     )
+
+
+CEC_DEVICE = os.getenv("CEC_DEVICE", "/dev/cec0")
+
+
+async def _cec_volume_step(direction: str, steps: int = 1) -> None:
+    """Send CEC volume up/down/mute commands to the TV."""
+    code = {"up": "0x41", "down": "0x42", "mute": "0x43"}[direction]
+    for _ in range(steps):
+        await asyncio.to_thread(
+            subprocess.run,
+            ["cec-ctl", f"-d{CEC_DEVICE}", "--to", "0",
+             "--user-control-pressed", f"ui-cmd={code}"],
+            capture_output=True, timeout=5,
+        )
+        await asyncio.sleep(0.2)
+        await asyncio.to_thread(
+            subprocess.run,
+            ["cec-ctl", f"-d{CEC_DEVICE}", "--to", "0",
+             "--user-control-released"],
+            capture_output=True, timeout=5,
+        )
+        await asyncio.sleep(0.1)
+
+
+class VolumeRequest(BaseModel):
+    steps: int = Field(1, ge=1, le=20)
+
+
+@app.post("/volume/up")
+async def volume_up(req: Optional[VolumeRequest] = None):
+    steps = req.steps if req else 1
+    await _cec_volume_step("up", steps)
+    logger.info("CEC volume up %d steps", steps)
+    return {"status": "ok", "direction": "up", "steps": steps}
+
+
+@app.post("/volume/down")
+async def volume_down(req: Optional[VolumeRequest] = None):
+    steps = req.steps if req else 1
+    await _cec_volume_step("down", steps)
+    logger.info("CEC volume down %d steps", steps)
+    return {"status": "ok", "direction": "down", "steps": steps}
+
+
+@app.post("/volume/mute")
+async def volume_mute():
+    await _cec_volume_step("mute", 1)
+    logger.info("CEC mute toggle")
+    return {"status": "ok", "action": "mute"}
 
 
 @app.post("/cache/clear")

@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     pulseaudio-utils \
     sox \
+    v4l-utils \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
