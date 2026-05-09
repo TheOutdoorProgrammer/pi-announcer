@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -30,7 +31,7 @@ player = AudioPlayer(
 
 class AnnounceRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=500)
-    volume: int | None = Field(None, ge=0, le=100)
+    volume: Optional[int] = Field(None, ge=0, le=100)
     priority: str = Field("normal", pattern="^(normal|urgent)$")
 
 

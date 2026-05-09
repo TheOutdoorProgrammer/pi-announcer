@@ -2,6 +2,7 @@ import asyncio
 import logging
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,7 @@ class AudioPlayer:
         self.default_volume = default_volume
         self._lock = asyncio.Lock()
 
-    async def play(self, wav_path: Path, volume: int | None = None) -> None:
+    async def play(self, wav_path: Path, volume: Optional[int] = None) -> None:
         """Play a WAV file through PulseAudio. Queues if something is already playing."""
         vol = volume if volume is not None else self.default_volume
 
